@@ -399,7 +399,7 @@
   <!-- API 키 -->
   <div class="api-section">
     <span class="api-label">API KEY</span>
-    <input type="password" class="api-input" id="apiKey" placeholder="sk-ant-api03-..." />
+    <input type="password" class="api-input" id="apiKey" placeholder="AIzaSy..." />
     <button class="api-save" onclick="saveApiKey()">저장</button>
     <div class="api-status" id="apiStatus"></div>
   </div>
@@ -520,7 +520,7 @@
     <div id="historyList"></div>
   </div>
 
-  <footer>PROMPT BUILDER &nbsp;·&nbsp; POWERED BY CLAUDE</footer>
+  <footer>PROMPT BUILDER &nbsp;·&nbsp; POWERED BY GEMINI</footer>
 </div>
 
 <script>
@@ -549,8 +549,8 @@ selections['quality'] = { label: '최고 품질', val: 'masterpiece, best qualit
 function saveApiKey() {
   const k = document.getElementById('apiKey').value.trim();
   const st = document.getElementById('apiStatus');
-  if (!k.startsWith('sk-ant-')) {
-    st.textContent = '올바른 Anthropic API 키 형식이 아닙니다 (sk-ant-...)';
+  if (!k.startsWith('AIza')) {
+    st.textContent = '올바른 Gemini API 키 형식이 아닙니다 (AIzaSy...)';
     st.className = 'api-status err';
     return;
   }
@@ -573,7 +573,7 @@ async function translate() {
   const cardKeywords = selectedCards.map(s => s.val).join(', ');
   const userInput = directText || '(직접 입력 없음)';
 
-  const systemPrompt = `You are an expert Stable Diffusion prompt engineer specializing in Korean-to-English prompt translation.
+  const prompt = `You are an expert Stable Diffusion prompt engineer specializing in Korean-to-English prompt translation.
 
 The user provides:
 1. Selected style keywords (already in English)
@@ -593,9 +593,9 @@ Rules for positive:
 
 Rules for negative:
 - Include: blurry, low quality, bad anatomy, deformed, ugly, bad hands, extra fingers, watermark, text, signature, cropped, worst quality, jpeg artifacts, duplicate
-- Add style-specific negatives based on the positive prompt`;
+- Add style-specific negatives based on the positive prompt
 
-  const userMsg = `카드 선택 키워드: ${cardKeywords || '없음'}
+카드 선택 키워드: ${cardKeywords || '없음'}
 한글 직접 입력: ${userInput}`;
 
   document.getElementById('translateBtn').disabled = true;
@@ -604,21 +604,19 @@ Rules for negative:
   document.getElementById('errorBox').classList.remove('show');
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMsg }]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }
       })
     });
 
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
 
-    const raw = data.content.map(b => b.text || '').join('');
+    const raw = data.candidates[0].content.parts[0].text;
     const clean = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
 
