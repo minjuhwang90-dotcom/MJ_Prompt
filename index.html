@@ -478,7 +478,7 @@
 예: 한구석에 웅크린 소년이 멍하니 바닥을 바라보며 손가락으로 원을 그리고 있다"></textarea>
   </div>
 
-  <button class="translate-btn" id="translateBtn" onclick="translate()">
+  <button class="translate-btn" id="translateBtn" onclick="generatePrompt()">
     프롬프트 생성하기 <span class="btn-arrow">→</span>
   </button>
 
@@ -559,7 +559,7 @@ function saveApiKey() {
   st.className = 'api-status ok';
 }
 
-async function translate() {
+async function generatePrompt() {
   if (!apiKey) { showError('API 키를 먼저 입력하고 저장해주세요.'); return; }
 
   const directText = document.getElementById('directInput').value.trim();
