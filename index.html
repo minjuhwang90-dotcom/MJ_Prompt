@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프롬프트 빌더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --bg2: #141414;
+    --bg3: #1a1a1a;
+    --border: rgba(255,255,255,0.08);
+    --border-hover: rgba(255,255,255,0.2);
+    --accent: #c8ff00;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --text2: #888;
+    --text3: #555;
+    --card-hover: rgba(200,255,0,0.04);
+    --mono: 'Space Mono', monospace;
+    --sans: 'Noto Sans KR', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* 노이즈 배경 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
+
+  /* 헤더 */
+  header {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--accent); }
+  .sub {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--text2);
+    font-weight: 300;
+  }
+
+  /* API 키 섹션 */
+  .api-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .api-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .api-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-input:focus { border-color: var(--accent); }
+  .api-save {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .api-save:hover { opacity: 0.85; }
+  .api-save:active { transform: scale(0.97); }
+  .api-status { font-size: 11px; width: 100%; margin-top: -4px; }
+  .api-status.ok { color: var(--accent); }
+  .api-status.err { color: var(--accent2); }
+
+  /* 섹션 제목 */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* 카드 선택 그룹 */
+  .category { margin-bottom: 32px; }
+  .category-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .category-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+  .cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    color: var(--text2);
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .card:hover { border-color: var(--border-hover); color: var(--text); }
+  .card:hover::before { opacity: 0.04; }
+  .card.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,255,0,0.06);
+  }
+  .card.selected::before { opacity: 0; }
+  .card span { position: relative; z-index: 1; }
+
+  /* 직접 입력 */
+  .direct-section { margin-bottom: 32px; }
+  .direct-input {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--text);
+    resize: vertical;
+    min-height: 100px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.7;
+  }
+  .direct-input:focus { border-color: rgba(200,255,0,0.4); }
+  .direct-input::placeholder { color: var(--text3); }
+
+  /* 번역 버튼 */
+  .translate-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .translate-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  .translate-btn:active { transform: translateY(0) scale(0.99); }
+  .translate-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+  .btn-arrow { font-size: 18px; transition: transform 0.2s; }
+  .translate-btn:hover .btn-arrow { transform: translateX(4px); }
+
+  /* 로딩 */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 32px;
+    color: var(--text3);
+  }
+  .loading.show { display: block; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 결과 */
+  .result-section { display: none; }
+  .result-section.show { display: block; }
+
+  .result-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .result-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .result-tag.pos { color: var(--accent); }
+  .result-tag.neg { color: var(--accent2); }
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.1em;
+  }
+  .copy-btn:hover { border-color: var(--border-hover); color: var(--text); }
+  .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
+  .result-text {
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* 선택 요약 */
+  .summary-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+  .chip {
+    background: rgba(200,255,0,0.08);
+    border: 1px solid rgba(200,255,0,0.2);
+    border-radius: 100px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--accent);
+    font-family: var(--mono);
+  }
+
+  /* 다시하기 */
+  .reset-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 16px;
+  }
+  .reset-btn:hover { border-color: var(--border-hover); color: var(--text2); }
+
+  /* 에러 */
+  .error-box {
+    display: none;
+    background: rgba(255,107,53,0.08);
+    border: 1px solid rgba(255,107,53,0.3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--accent2);
+    margin-bottom: 16px;
+  }
+  .error-box.show { display: block; }
+
+  /* 히스토리 */
+  .history-section { margin-top: 40px; }
+  .history-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .history-item:hover { border-color: var(--border-hover); }
+  .history-time { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-bottom: 4px; }
+  .history-korean { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+  .history-preview { font-family: var(--mono); font-size: 11px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">// Prompt Builder</div>
+    <h1>한글로 쓰면<br><span>프롬프트</span>가 됩니다</h1>
+    <p class="sub">카드를 고르거나 직접 입력 — Claude AI가 SD 프롬프트로 번역해줍니다</p>
+  </header>
+
+  <!-- API 키 -->
+  <div class="api-section">
+    <span class="api-label">API KEY</span>
+    <input type="password" class="api-input" id="apiKey" placeholder="sk-ant-api03-..." />
+    <button class="api-save" onclick="saveApiKey()">저장</button>
+    <div class="api-status" id="apiStatus"></div>
+  </div>
+
+  <!-- 카드 선택 -->
+  <div class="section-label">카드로 고르기</div>
+
+  <div class="category">
+    <div class="category-title"><span class="dot"></span>스타일</div>
+    <div class="cards" id="cat-style">
+      <div class="card" data-cat="style" data-val="photorealistic, hyperrealistic"><span>사실적 / 실사</span></div>
+      <div class="card" data-cat="style" data-val="anime style, detailed illustration"><span>애니메이션</span></div>
+      <div class="card" data-cat="style" data-val="cinematic, movie still, film grain"><span>시네마틱</span></div>
+      <div class="card" data-cat="style" data-val="oil painting, painterly, impressionist"><span>유화</span></div>
+      <div class="card" data-cat="style" data-val="watercolor, soft washes, delicate"><span>수채화</span></div>
+      <div class="card" data-cat="style" data-val="pencil sketch, detailed lineart, monochrome"><span>스케치</span></div>
+      <div class="card" data-cat="style" data-val="3D render, octane render, CGI"><span>3D 렌더</span></div>
+      <div class="card" data-cat="style" data-val="pixel art, retro game style"><span>픽셀 아트</span></div>
+    </div>
+  </div>
+
+  <div class="category">
+    <div class="category-title"><span class="dot"></span>분위기</div>
+    <div class="cards" id="cat-mood">
+      <div class="card" data-cat="mood" data-val="melancholic, lonely, somber"><span>우울 / 쓸쓸</span></div>
+      <div class="card" data-cat="mood" data-val="warm, cozy, heartwarming"><span>따뜻 / 포근</span></div>
+      <div class="card" data-cat="mood" data-val="dramatic, intense, powerful"><span>드라마틱</span></div>
+      <div class="card" data-cat="mood" data-val="peaceful, serene, tranquil"><span>평화 / 고요</span></div>
+      <div class="card" data-cat="mood" data-val="mysterious, eerie, unsettling"><span>신비 / 으스스</span></div>
+      <div class="card" data-cat="mood" data-val="romantic, dreamy, soft"><span>로맨틱 / 몽환</span></div>
+      <div class="card" data-cat="mood" data-val="energetic, vibrant, dynamic"><span>활기 / 역동</span></div>
+      <div class="card" data-cat="mood" data-val="nostalgic, vintage, retro"><span>향수 / 레트로</span></div>
+    </div>
+  </div>
+
+  <div class="category">
+    <div class="category-title"><span class="dot"></span>조명</div>
+    <div class="cards" id="cat-lighting">
+      <div class="card" data-cat="lighting" data-val="golden hour, warm sunlight"><span>황금빛 노을</span></div>
+      <div class="card" data-cat="lighting" data-val="soft dim lighting, low key"><span>어둡고 부드러운</span></div>
+      <div class="card" data-cat="lighting" data-val="bright natural light, daylight"><span>밝은 자연광</span></div>
+      <div class="card" data-cat="lighting" data-val="neon lights, cyberpunk glow"><span>네온 / 사이버펑크</span></div>
+      <div class="card" data-cat="lighting" data-val="moonlight, night scene, dark"><span>달빛 / 야경</span></div>
+      <div class="card" data-cat="lighting" data-val="window light, interior, soft rays"><span>창문 빛 / 실내</span></div>
+      <div class="card" data-cat="lighting" data-val="dramatic side lighting, chiaroscuro"><span>극적인 측면 조명</span></div>
+    </div>
+  </div>
+
+  <div class="category">
+    <div class="category-title"><span class="dot"></span>구도</div>
+    <div class="cards" id="cat-composition">
+      <div class="card" data-cat="composition" data-val="close-up portrait, face detail"><span>클로즈업</span></div>
+      <div class="card" data-cat="composition" data-val="full body shot, full figure"><span>전신</span></div>
+      <div class="card" data-cat="composition" data-val="wide shot, establishing shot"><span>와이드샷</span></div>
+      <div class="card" data-cat="composition" data-val="aerial view, bird's eye view"><span>조감도</span></div>
+      <div class="card" data-cat="composition" data-val="low angle shot, worm's eye view"><span>로우앵글</span></div>
+      <div class="card" data-cat="composition" data-val="dutch angle, tilted frame"><span>기울어진 구도</span></div>
+    </div>
+  </div>
+
+  <div class="category">
+    <div class="category-title"><span class="dot"></span>품질 태그</div>
+    <div class="cards" id="cat-quality">
+      <div class="card selected" data-cat="quality" data-val="masterpiece, best quality"><span>최고 품질</span></div>
+      <div class="card" data-cat="quality" data-val="8k uhd, ultra high resolution"><span>8K 해상도</span></div>
+      <div class="card" data-cat="quality" data-val="sharp focus, highly detailed"><span>선명 / 디테일</span></div>
+      <div class="card" data-cat="quality" data-val="award winning photography"><span>수상작 수준</span></div>
+    </div>
+  </div>
+
+  <!-- 직접 입력 -->
+  <div class="section-label" style="margin-top: 8px;">직접 입력</div>
+  <div class="direct-section">
+    <textarea class="direct-input" id="directInput"
+      placeholder="묘사하고 싶은 장면을 자유롭게 한글로 써주세요.
+예: 한구석에 웅크린 소년이 멍하니 바닥을 바라보며 손가락으로 원을 그리고 있다"></textarea>
+  </div>
+
+  <button class="translate-btn" id="translateBtn" onclick="translate()">
+    프롬프트 생성하기 <span class="btn-arrow">→</span>
+  </button>
+
+  <div class="error-box" id="errorBox"></div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div style="font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em;">TRANSLATING...</div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="result-section" id="resultSection">
+    <div class="section-label">선택 요약</div>
+    <div class="summary-chips" id="summaryChips"></div>
+
+    <div class="section-label">생성된 프롬프트</div>
+
+    <div class="result-box">
+      <div class="result-header">
+        <span class="result-tag pos">POSITIVE</span>
+        <button class="copy-btn" onclick="copyResult('positiveText', this)">COPY</button>
+      </div>
+      <div class="result-text" id="positiveText"></div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-header">
+        <span class="result-tag neg">NEGATIVE</span>
+        <button class="copy-btn" onclick="copyResult('negativeText', this)">COPY</button>
+      </div>
+      <div class="result-text" id="negativeText"></div>
+    </div>
+
+    <button class="reset-btn" onclick="resetAll()">↺ &nbsp; 처음부터 다시</button>
+  </div>
+
+  <!-- 히스토리 -->
+  <div class="history-section" id="historySection" style="display:none;">
+    <div class="section-label">번역 기록</div>
+    <div id="historyList"></div>
+  </div>
+
+  <footer>PROMPT BUILDER &nbsp;·&nbsp; POWERED BY CLAUDE</footer>
+</div>
+
+<script>
+let apiKey = '';
+let history = [];
+const selections = {};
+
+// 카드 클릭
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('click', () => {
+    const cat = card.dataset.cat;
+    if (card.classList.contains('selected')) {
+      card.classList.remove('selected');
+      delete selections[cat];
+    } else {
+      document.querySelectorAll(`.card[data-cat="${cat}"]`).forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selections[cat] = { label: card.querySelector('span').textContent, val: card.dataset.val };
+    }
+  });
+});
+
+// 초기 선택 (품질 기본값)
+selections['quality'] = { label: '최고 품질', val: 'masterpiece, best quality' };
+
+function saveApiKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  const st = document.getElementById('apiStatus');
+  if (!k.startsWith('sk-ant-')) {
+    st.textContent = '올바른 Anthropic API 키 형식이 아닙니다 (sk-ant-...)';
+    st.className = 'api-status err';
+    return;
+  }
+  apiKey = k;
+  st.textContent = '✓ 저장됐어요';
+  st.className = 'api-status ok';
+}
+
+async function translate() {
+  if (!apiKey) { showError('API 키를 먼저 입력하고 저장해주세요.'); return; }
+
+  const directText = document.getElementById('directInput').value.trim();
+  const selectedCards = Object.values(selections);
+
+  if (!directText && selectedCards.length === 0) {
+    showError('카드를 선택하거나 직접 내용을 입력해주세요.');
+    return;
+  }
+
+  const cardKeywords = selectedCards.map(s => s.val).join(', ');
+  const userInput = directText || '(직접 입력 없음)';
+
+  const systemPrompt = `You are an expert Stable Diffusion prompt engineer specializing in Korean-to-English prompt translation.
+
+The user provides:
+1. Selected style keywords (already in English)
+2. Korean description text (may be empty)
+
+Your task: Create the best possible SD prompt by combining both inputs.
+
+Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
+{"positive": "keyword1, keyword2, ...", "negative": "keyword1, keyword2, ..."}
+
+Rules for positive:
+- Merge the card selections naturally with the translated Korean text
+- Use comma-separated visual keywords
+- Focus on: subject, action, environment, lighting, style, mood, quality
+- Make it vivid and specific
+- Max 180 tokens
+
+Rules for negative:
+- Include: blurry, low quality, bad anatomy, deformed, ugly, bad hands, extra fingers, watermark, text, signature, cropped, worst quality, jpeg artifacts, duplicate
+- Add style-specific negatives based on the positive prompt`;
+
+  const userMsg = `카드 선택 키워드: ${cardKeywords || '없음'}
+한글 직접 입력: ${userInput}`;
+
+  document.getElementById('translateBtn').disabled = true;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('errorBox').classList.remove('show');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const raw = data.content.map(b => b.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    document.getElementById('positiveText').textContent = parsed.positive;
+    document.getElementById('negativeText').textContent = parsed.negative;
+
+    // 요약 칩
+    const chips = document.getElementById('summaryChips');
+    chips.innerHTML = selectedCards.map(s => `<div class="chip">${s.label}</div>`).join('');
+    if (directText) chips.innerHTML += `<div class="chip">직접입력 ✓</div>`;
+
+    document.getElementById('resultSection').classList.add('show');
+
+    addHistory(userInput, parsed.positive);
+
+  } catch (e) {
+    showError('오류가 발생했어요: ' + e.message);
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('translateBtn').disabled = false;
+  }
+}
+
+function copyResult(id, btn) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'COPIED!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function resetAll() {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  Object.keys(selections).forEach(k => delete selections[k]);
+  // 품질 기본값 복원
+  const defaultQuality = document.querySelector('.card[data-val="masterpiece, best quality"]');
+  if (defaultQuality) { defaultQuality.classList.add('selected'); selections['quality'] = { label: '최고 품질', val: 'masterpiece, best quality' }; }
+  document.getElementById('directInput').value = '';
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('errorBox').classList.remove('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function addHistory(korean, positive) {
+  history.unshift({ korean: korean.slice(0, 40), positive, time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) });
+  if (history.length > 6) history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const sec = document.getElementById('historySection');
+  const list = document.getElementById('historyList');
+  if (history.length === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = history.map((h, i) => `
+    <div class="history-item" onclick="loadHistory(${i})">
+      <div class="history-time">${h.time}</div>
+      <div class="history-korean">${h.korean}${h.korean.length >= 40 ? '...' : ''}</div>
+      <div class="history-preview">${h.positive}</div>
+    </div>
+  `).join('');
+}
+
+function loadHistory(i) {
+  document.getElementById('positiveText').textContent = history[i].positive;
+  document.getElementById('resultSection').classList.add('show');
+  window.scrollTo({ top: document.getElementById('resultSection').offsetTop - 20, behavior: 'smooth' });
+}
+
+// Ctrl+Enter 단축키
+document.getElementById('directInput').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') translate();
+});
+</script>
+</body>
+</html>
